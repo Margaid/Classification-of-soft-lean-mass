@@ -126,187 +126,206 @@ boxplot(antro[detecting.outliers],range=range,las=2)
 inbo=read.csv("dane_inbody.csv")
 
 #glimpse of the data
-#usuni?cie niepotrzebnych lub powtarzaj?cych si? kolumn
+#deleting unnecessary or duplicated columns 
 inbo=inbo[,-c(2,3,122:222)]
 
-#brak warto?ci zamieniane na NA
+#changing missing values to NA
 inbo[inbo==""]=NA
 
-#sprawdzenie czy jakie? wiersze si? duplikuj?
+#looking for duplicated rows
 which(duplicated(inbo)==TRUE)
-#?adne wiersze si? nie powtarzaj?
+#there are no duplicated rows
 
-#sprawdzenie typu pierwszych pi?ciu zmiennych
+#type of first 5 variables
 str(inbo[,1:5])
 
-#zmiana zmiennje id na zmienn? kategoryczna
+#changing type of id to categorical
 inbo[,1]=factor(inbo[,1])
-#zobaczenie ile jest ka?dego id
 summary(inbo[,1], maxsum = 300)
 
-#zmiana typu zmiennej dateofbirth na date
+#changing type of DateOfBirth to date
 inbo$DateOfBirth=as.Date(parse_date_time(inbo$DateOfBirth, c("ymd", "dmy")))
-#zmiana typu zmiennej data badania na datetime 
+#changing type of DataBadania to datetime 
 inbo$DataBadania=as.POSIXct(inbo$DataBadania, format="%Y.%m.%d. %H:%M:%S")
 
-#sprawdzenie czy w zmiennej Sex s? inne warto?ci ni? M i F
+#checking unique vlaues in variable Sex
 unique(inbo$Sex)
-# nie ma
-#zamiana female na 0 i male na 1
+# there are only F and M, so I'm changing this to 0 and 1, respectively
 inbo$Sex[inbo$Sex=="F"]=0
 inbo$Sex[inbo$Sex=="M"]=1
-#zmiana tpyu zmiennej na kategoryczn?
+#changing type of Sex to categorical
 inbo$Sex=as.factor(inbo$Sex)
 
-#Zamiana zmiennej Age na zmienn? ca?kowit?
+#changing type of Age to integer
 inbo$Age=as.integer(inbo$Age)
+
 library(wesanderson)
 paleta=wes_palette(name="Darjeeling2")
-#wykres s?upkowy dla zmiennej Age
-hist(inbo$Age, col=paleta, main="Age")
+#histogram of Age
+hist(inbo$Age, col=paleta, main="Histogram of Age")
 
-#warto?ci wi?ksze od 21
-za.stary=which(inbo$Age>21) 
-inbo$id[za.stary] 
-#sprawdzenie reszty danych, gdzie wiek jest za du?y
-inbo[inbo$id==142,1:10]
-#poprawienie pierwszej daty urodzenia, gdy? r??ni si? od pozosta?ych dw?ch
+#finding values greater than 21 in Age
+too.old=which(inbo$Age>21) 
+id.too.old=inbo$id[too.old] 
+#checking rest of the data
+inbo[inbo$id %in% id.too.old, 1:10]
+#correcting the first date, because it differs from the rest for this id
 inbo[34,2]="1999-11-16"
-#zmienie wieku na odpowiedni
+#now I'm correcting the Age
 inbo[34,3]=15
 
-#sprawdzenie czy w reszcie danych zgadza si? wiek z dat? urodzenia i badaniem
+#checking whether the age is correct with date of examination and date of birth
 ag=c()
-for(x in 1:872){
+for(x in 1:length(inbo)){
   if(floor(as.numeric(difftime(inbo[x,"DataBadania"], inbo[x,"DateOfBirth"], units = "days"))/365.242199)!=inbo[x,"Age"]){
     ag=c(ag,x)
   }
 }
-inbo[ag,1:5]
-#jeden wiersz, kt?ry zosta? wskazany, ma poprawny wiek
+if(is.null(ag)){
+  print("age is correct in every row")
+} else{
+  inbo[ag,1:5]
+}
 
-#sprawdznie czy jest przypisana ta sama p?e? do tego samego id
+
+#checking if everywhere is the same gender for one id
 for (i in levels(inbo$id)){
   b=inbo$Sex[inbo$id==i]
-  #zamiana, je?li p?e? nie jest wsz?dzie taka sama na t?, kt?rej jest wi?cej
+  #changing sex to the one of which there are more
   if(!(all(b==1) | all(b==0))){
     inbo$Sex[inbo$id==i]=names(which.max(table(b)))
   }
-  
 }
 
 summary(inbo)
-#usuni?cie kolumn, gdzie wyst?puje s?owo Impedance
+#deleting columns with word Impedance
 imp=grep("Impedance",names(inbo),fixed=TRUE) 
 inbo=inbo[,-imp]
 
-#usuni?cie 0 i warto?ci mniejszych z wyj?tkiem kolumn, gdzie mog? wyst?powa?
-kol_moga_byc_0=c(75:77)
-kolumny_z_0_do_usun=setdiff(c(1:ncol(inbo)),kol_moga_byc_0)
-inbo[,kolumny_z_0_do_usun][inbo[,kolumny_z_0_do_usun]<=0]=NA
+#deleting values less or equal to 0, besides columns where these values can appear
+col.with.0=c(75:77)
+col.with.0.to.delete=setdiff(c(1:ncol(inbo)),col.with.0)
+inbo[,col.with.0.to.delete][inbo[,col.with.0.to.delete]<=0]=NA
 
-#zmiana typu zmiennej Visceral Fat level na zmienna kategoryczna
+
+str(inbo, list.len=length(inbo))
+
+#changing type of Visceral Fat level to categorical
 inbo[,82]=factor(inbo[,82])
 
-str(inbo, list.len=105)
+#number of na in every column
+colSums(is.na(inbo))
+#I'm leaving missing values in df
 
-#po??czenia antro i inbo
-lk_antro=ncol(antro)-1
-lk_inbo=ncol(inbo)-1
-#liczba wierszy nowej macierzy
-lw=nrow(antro)
-#liczba kolumn nowej macierzy
-lk=lk_antro+lk_inbo+1
-#stworzenie nowej macierzy
-m=matrix(NA, nrow=lw, ncol=lk, dimnames=list(ID=1:nrow(antro),
-                                             Zmienne=c("ID",names(antro)[-1],names(inbo)[-1])))
-#zamienie macierzy na ramk? danych
+
+
+#merging antro and inbo datasets
+
+#deleting id and date of measurement in inbo
+inbo.for.new.matrix=inbo[-c(1,5)]
+
+num.col.antro=ncol(antro)-1
+num.col.inbo=ncol(inbo.for.new.matrix)
+#number of rows new matrix
+num.rows=nrow(antro)
+#number of columns new matrix
+num.cols=num.col.antro+num.col.inbo+1
+
+#creating new matrix
+m=matrix(NA, nrow=num.rows, ncol=num.cols, dimnames=list(ID=1:nrow(antro),
+                                             colnames=c("ID",names(antro)[-1],names(inbo.for.new.matrix))))
+
+#creating data frame from matrix
 m=as.data.frame(m)
-#dodanie wpis?w do kolumny id
+#column filling -> id
 m[,1]=row.names(m)
-#zmiana typu zmiennej na date
-daty=c(2,22,25)
-m[,daty] = lapply(m[,daty], as.Date, origin="1899-12-30")
-#przypisanie danych z antro do m
+#changing type of column, where are dates
+dates=c(2,22)
+m[,dates] = lapply(m[,dates], as.Date, origin="1899-12-30")
+#values from antro
 m[,2:21]=antro[,2:21]
-#przypisanie id i daty badania z antro
-id.data.wiersz=antro[,1:2]
-#dodanie do tego wiersz odpowiadaj?cy w nowej ramce danych
-id.data.wiersz=cbind(id.data.wiersz,1:nrow(antro))
 
-#po??czenie  antro i inbo
+#id and date of measurement from antro (to correctly merge antro and inbo)
+id.date.row=antro[,1:2]
+#adding id from new df corresponding to their id from antro
+id.date.row=cbind(id.date.row,1:nrow(antro))
+
+#merging according to date of measurement
 for (j in 1:nrow(inbo))
 {
   id2 = inbo[j, 1]
-  data2=inbo[j, 5]
+  date2=inbo[j, 5]
   for(i in 1:nrow(antro)){
-    data = id.data.wiersz[i,2]
-    if (((year(data)==year(data2)))&(((month(data)==month(data2))|(month(data)+1==month(data2)))&(id2==antro[i,1])))
+    date = id.date.row[i,2]
+    #sometimes the second measurement was a month later, so months are equal or one month difference
+    if (((year(date)==year(date2)))&(((month(date)==month(date2))|(month(date)+1==month(date2)))&(id2==antro[i,1])))
     {
-      wiersz=id.data.wiersz[i,3]
-      m[wiersz,22:125]=inbo[j,2:105]
+      wiersz=id.date.row[i,3]
+      m[wiersz,22:124]=inbo.for.new.matrix[j,]
     } 
   }
 }
-#zmiana typu zmiennych
+
+
+#changing type of variables
 m[,1]=as.integer(m[,1]) 
-m[,24]=factor(m[,24])
-library(dummies)
-#zamiana zmiennych kategorycznych na fikcyjne
-m=dummy.data.frame(m)
-#usuni?cie dw?ch kolumn, kt?re nam nie odpowiadaj?
-m=m[,-c(24,26)] 
-#zmiana nazwy kolumny
-names(m)[24]="Sex"
 
-#sprawdzanie korelacji mi?dzy danymi
-dane.z.antro=c(3,4,5,26,29,32,35,50,70)
-dane.z.inbo=c(47:49)
-summary(m[,c(117:121)])
+m[,"Sex"]=ifelse(m$Sex == "2", 1, 0)
+m[,"Sex"]=factor(m[,"Sex"])
 
-#du?a korelacja Soft lean mass z LowerLimit_FFMofRightArmNormalRange_, UpperLimit_FFMofRightArmNormalRange_,
+
+#linear correlation 
+
+chosen.variables=c(3,4,5,25,28,31,34,49,69)
+soft.lean.mass=c(46:48)
+
+#strong correlation between Soft lean mass and LowerLimit_FFMofRightArmNormalRange_, UpperLimit_FFMofRightArmNormalRange_,
 # LowerLimit_FFMofLeftArmNormalRange_, UpperLimit_FFMofLeftArmNormalRange_, LowerLimit_FFMofTrunkNormalRange_
 #UpperLimit_FFMofTrunkNormalRange_, UpperLimit_FFMofRightLegNormalRange_, UpperLimit_FFMofLeftLegNormalRange_,
-#ale jest a? 599 brakuj?cych warto?ci
+#but there are 599 missing values, so I'm not using this variables
 #TargetWeight (508 NA)
 #FFMofRightLeg, FFMofLeftLeg, BMR_BasalMetabolicRate_ (398 NA)
 
 
 library(corrplot)
 library(PerformanceAnalytics)
-M=cor(x=m[,dane.z.antro], y=m[,dane.z.inbo], 
+M=cor(x=m[,chosen.variables], y=m[,soft.lean.mass], 
       use="pairwise.complete.obs", method="pearson")
-kolorki=colorRampPalette(c("royalblue4","white","red4"))(200)
-#wykres korelacji soft lean mass i innych danych
-corrplot(M, col=kolorki)
+#kolorki=colorRampPalette(c("royalblue4","white","red4"))(200)
+#corrplot(M, col=kolorki)
 corrplot(M,method="number")
-chart.Correlation(m[,c(dane.z.antro, dane.z.inbo)], hostogram=TRUE, pch=21, method="pearson")
+chart.Correlation(m[,c(chosen.variables, soft.lean.mass)], hostogram=TRUE, pch=21, method="pearson")
 
-#przypisanie wybranych danych do d
-d=m[,c(3,4,5,26,29,32,35,50,70)]
+
+#creating df with chosen variables
+d=m[,chosen.variables]
 
 #soft lean mass
 slm=rep(NA, nrow(m))
-#je?li miesci sie w dolnej i g?rnej granicy to 1, inaczej 0
-slm[(m[,47]<m[,48])|(m[,47]>m[,49])]=0
-slm[(m[,47]>=m[,48])&(m[,47]<=m[,49])]=1
+#creating variable for predicting
+#if soft lean mass is between normal range -> 1, else 0
+slm[(m[,46]<m[,47])|(m[,46]>m[,48])]=0
+slm[(m[,46]>=m[,47])&(m[,46]<=m[,48])]=1
 
-#zmiana typu zmiennej na kategoryczn?
+#changing type to categorical
 slm=factor(slm)
 summary(slm)
+#checking if class is balanced
+options(digits = 2)
+prop.table(table(slm))
+#mild degree of imbalanced data
 
-#po??czenie slm z reszt? danych
+#joining slm with rest of the data
 d=cbind(d,slm)
 names(d)[ncol(d)]="SoftLeanMass"
 
 
-
-#ocena klasyfikatora
-ocena<-function(macierz.bledow){
-  tp=macierz.bledow[1,1]
-  fp=macierz.bledow[1,2]
-  fn=macierz.bledow[2,1]
-  tn=macierz.bledow[2,2]
+#classification evaluation
+evaluation<-function(confusion.matrix){
+  tp=confusion.matrix[1,1]
+  fp=confusion.matrix[1,2]
+  fn=confusion.matrix[2,1]
+  tn=confusion.matrix[2,2]
   acc=(tp+tn)/(tp+tn+fp+fn)
   sen=tp/(tp+fn)
   spe=tn/(tn+fp)
@@ -314,54 +333,45 @@ ocena<-function(macierz.bledow){
   
   f1=2*pre*sen/(pre+sen)
   
-  jakosc.ramka=data.frame(acc,sen,spe,pre,f1)
-  return(jakosc.ramka)
+  df=data.frame(acc,sen,spe,pre,f1)
+  return(df)
 }  
-#normalizacja danych
+
+#data normalization
 normalize <- function(x) {
   return(x-min(x))/(max(x)-min(x))
 }
-#mieszanie danych
+#shuffling data
 shuffle <- function(x) {
   return (x[sample(1:nrow(x)), ])
 }
 
 library(caTools)
-#pozbycie si? na z kolumny SoftLeanMass
+#dealing with missing values
+#deleting missing values from d
 d2=subset(d,!is.na(d$SoftLeanMass))
-summary(d2$SoftLeanMass) #sprawdzenie czy zosta?y ju? tylko 0 i 1
-#gdzie s? NA
-complete.cases(d2)
-#usuni?cie wierszy, gdzie znajduje si? NA
+summary(d2$SoftLeanMass) 
+#deleting rows with missing values
 d2=d2[complete.cases(d2),]
-#mieszanie wierszy
-d2=shuffle(d2)
-#podzielenie na zbi?r testuj?cy i waliduj?cy
+
 split=sample.split(d2$SoftLeanMass, SplitRatio=0.7)
-train_set=subset(d2,split==TRUE)
-test_set=subset(d2,split==FALSE)
-#sprawdzenie proporcji miedzy 0 a 1
-options(digits = 2)
-prop.table(table(test_set[,ncol(d2)]))
 
 
 #KNN
 library(class)
-#stworzenie macierzy i ramek danych
-wyniki.knn=matrix(nrow=30, ncol=5*10)
-colnames(wyniki.knn)=rep(c("acc","sen","spe","pre","f1"), length.out=5*10)
-wyniki.knn=as.data.frame(wyniki.knn)
+results.knn=matrix(nrow=30, ncol=5*10)
+colnames(results.knn)=rep(c("acc","sen","spe","pre","f1"), length.out=5*10)
+results.knn=as.data.frame(results.knn)
 for (j in 1:10){
-  srednia.knn=matrix(nrow=30,ncol=5)
-  #dla liczby s?siad?w od 1 do 30  
+  mean.knn=matrix(nrow=30,ncol=5)
+  #knn neighbors from 1 to 30
   for (k in 1:30){
-    wyn.knn=matrix(nrow=1000, ncol=5)
-    wyn.knn=as.data.frame(wyn.knn)
-    #powt?rzenie dla ka?dego z s?siad?w 1000 razy
+    res.knn=matrix(nrow=1000, ncol=5)
+    res.knn=as.data.frame(res.knn)
+    #repeating 1000 times for every number of neighbor
     for (i in 1:1000){
-      #mieszanie wierszy
       d2=shuffle(d2)
-      #podzia? na zbi?r trenuj?cy i testujacy 
+      #splitting data
       train_set=subset(d2,split==TRUE)
       test_set=subset(d2,split==FALSE)
       trainX=train_set[,-ncol(d2)]
@@ -373,34 +383,34 @@ for (j in 1:10){
       
       #knn
       knn.pred=knn(trains,tests, trainY,k=k)
-      wyn=table(knn.pred,testY)
-      wyn.knn[i,]=ocena(wyn)
+      res=table(knn.pred,testY)
+      res.knn[i,]=evaluation(res)
       
     }
-    srednia.knn[k,]=colMeans(wyn.knn)
+    mean.knn[k,]=colMeans(res.knn)
   }
-  #zapisanie wykresu -> u?rednione wyniki dla ka?dej z pr?b
+  #saving plot -> mean results for each trial
   while(names(dev.cur())!="null device")dev.off()
   png(paste(paste("knn",j,sep="_"),".png",sep=""),width=1000,height=800)
-  matplot(srednia.knn, type = c("b"),pch=1,col = 1:5, xlab="warto?? k",
-          ylab="?rednia dok?adno??, czu?o??, specyficzno??, precyzja, f1", main=paste("KNN ",j)) 
+  matplot(mean.knn, type = c("b"),pch=1,col = 1:5, xlab="number of neighbors",
+          ylab="accuracy, sensitivity, specificity, precision, f1", main=paste("KNN ",j)) 
   legend("topleft", legend = c("acc","sen","spe","pre","f1"), col=1:5, pch=1)
   dev.off()
   
-  wyniki.knn[,(5*(j-1)+1):(5*j)]=srednia.knn
+  results.knn[,(5*(j-1)+1):(5*j)]=mean.knn
   
 }
-#stworzenie macierzy, gdzie b?d? u?rednione wyniki ka?dej pr?by
-wyniki=matrix(nrow=30,ncol=5)
-colnames(wyniki)=c("acc","sen","spe","pre","f1")
-wyniki=as.data.frame(wyniki)
+
+#creating dataframe for mean results from every trial
+mean.results.knn=matrix(nrow=30,ncol=5)
+colnames(mean.results.knn)=c("acc","sen","spe","pre","f1")
+mean.results.knn=as.data.frame(mean.results.knn)
 #u?rednienie wynik?w k ?redniej ka?dej pr?by
 v=1
-for (i in colnames(wyniki)){
-  print(i)
+for (i in colnames(mean.results.knn)){
   for(j in 1:30){
-    pom=wyniki.knn[j,(colnames(wyniki.knn)==i)]
-    wyniki[j,v]=rowMeans(pom)
+    pom=results.knn[j,(colnames(results.knn)==i)]
+    mean.results.knn[j,v]=rowMeans(pom)
   }
   v=v+1
 }
@@ -408,8 +418,8 @@ for (i in colnames(wyniki)){
 #zapisanie wykresu
 png("KNN.png",width=1000,height=800)
 #wykres pokazujacy u?rednione wyniki w zale?no?ci od liczby s?siad?W
-matplot(wyniki, type = c("b"),pch=1,col = 1:5, xlab="warto?? k",
-        ylab="?rednia dok?adno??, czu?o??, specyficzno??, precyzja, f1", main="KNN") 
+matplot(mean.results.knn, type = c("b"),pch=1,col = 1:5, xlab="warto?? k",
+        ylab="mean accuracy, sensitivity, specificity, precision, f1", main="KNN") 
 legend("topleft", legend = c("acc","sen","spe","pre","f1"), col=1:5, pch=1)
 dev.off()
 
@@ -440,7 +450,7 @@ for (j in 1:10){
     #naive bayes
     model=naive_bayes(SoftLeanMass ~ ., data = train_set) 
     bayes.pred=predict(model, testX)
-    wyn.bayes[i,]=ocena(table(bayes.pred,testY))
+    wyn.bayes[i,]=evaluation(table(bayes.pred,testY))
     
     
   }  
